@@ -1,0 +1,3 @@
+24届楚怡杯Python训练系统
+
+使用django框架加docker服务搭建而成
