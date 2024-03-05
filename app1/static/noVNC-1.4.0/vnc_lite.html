@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>noVNC</title>
+    <script type="module" crossorigin="anonymous">
+        import RFB from './core/rfb.js';
+        let rfb;
+
+        var url = "ws://112.111.32.112:32770/websockify";
+        var port = "32770";
+        var password = "123456";
+
+        rfb = new RFB(document.getElementById('screen'), url,
+                      { credentials: { password: password } });
+
+        rfb.addEventListener("connect",  connectedToServer);
+        rfb.addEventListener("disconnect", disconnectedFromServer);
+        rfb.addEventListener("credentialsrequired", credentialsAreRequired);
+        rfb.addEventListener("desktopname", updateDesktopName);
+        rfb.viewOnly = readQueryVariable('view_only', false);
+        rfb.scaleViewport = readQueryVariable('scale', false);
+    </script>
+</head>
+
+<body>
+    <div id="screen" style="width: 100%; height: 100%;"></div>
+</body>
+</html>

@@ -1,0 +1,284 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>noVNC</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+
+        #panel {
+            width: 32%;
+            height: 100%;
+            background-color: #f1f1f1;
+            float: left;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #controlsRow, #buttonsRow {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        #controlsRow > *, #buttonsRow > * {
+            margin-right: 10px;
+        }
+
+        #statusDisplay {
+            background: darkkhaki;
+            padding: 5px;
+        }
+
+        #screen {
+            width: 68%;
+            height: 100%;
+            background-color: #333;
+            float: left;
+        }
+
+        .button {
+            display: block;
+            padding: 5px 10px;
+        }
+
+        .full-screen-button {
+            display: block;
+            margin-top: 20px;
+        }
+        #pdfViewer {
+            width: 100%; /* 或者您希望的宽度 */
+            height: 100%; /* 或者您希望的高度 */
+        }
+    </style>
+</head>
+<body>
+<div id="panel">
+    <div id="controlsRow">
+        <input type="text" id="inputBox" placeholder="名字缩写">
+        <select id="selectBox">
+            <option value="1">网络爬虫</option>
+            <option value="2">数据清洗</option>
+            <option value="3">数据可视化</option>
+            <option value="4">机器学习</option>
+        </select>
+        <button class="button" id="confirmButton">确认</button>
+    </div>
+    <div id="buttonsRow">
+        <button class="button" id="restartButton">重启虚拟机</button>
+        <button class="button" id="resetButton">重置虚拟机</button>
+        <button class="button" id="stopButton">关闭虚拟机</button>
+        <button class="full-screen-button" id="fullScreenButton">全屏</button>
+    </div>
+    <div id="statusDisplay">状态: 未开启</div>
+    <embed id="pdfViewer" src="{% static '111.pdf' %}" type="application/pdf">
+</div>
+<div id="screen"></div>
+<!-- 加载 jQuery -->
+<script src="{% static 'jquery-3.7.1.min.js' %}"></script>
+<script type="module" crossorigin="anonymous">
+    import RFB from "{% static 'noVNC-1.4.0/core/rfb.js' %}";
+
+    $(document).ready(function () {
+        // 确认按钮点击事件
+        $('#confirmButton').on('click', function () {
+            // 获取名字缩写和类别
+            const name = $('#inputBox').val();
+            const category = $('#selectBox').val();
+            // 更新状态为 "开启中"
+            $('#statusDisplay').text('状态: 开启中').css('background', 'orange');
+            // 发送添加容器的 AJAX 请求
+            $.ajax({
+                url: '/add/',
+                type: 'POST',
+                data: {
+                    'name': name,
+                    'category': category,
+                    'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val() // CSRF token
+                },
+                success: function (data) {
+                    // 更新状态显示为返回的端口号
+                    $('#statusDisplay').text(`状态: 运行中 ${data.port}`).css('background', 'darkkhaki');
+
+                    // 调用连接虚拟机的函数
+                    connectToVm(data.port);
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    // 处理错误
+                    $('#statusDisplay').text('状态: 错误').css('background', 'red');
+                    console.error('Error:', textStatus, errorThrown);
+                }
+            });
+        });
+
+        // 重启容器点击事件
+        $('#restartButton').on('click', function () {
+            // 获取需要重启的容器信息
+            const name = $('#inputBox').val(); // 假设名字缩写用来标识容器
+            const category = $('#selectBox').val(); // 假设类别用来标识容器
+
+            // 更新状态为 "重启中"
+            $('#statusDisplay').text('状态: 重启中...').css('background', 'orange');
+
+            // 发送重启容器的 AJAX 请求
+            $.ajax({
+                url: '/restar/', // Django视图的URL
+                type: 'POST',
+                data: {
+                    'name': name,
+                    'category': category,
+                },
+                success: function (data) {
+                    // 更新状态显示为 "重启成功"
+                    $('#statusDisplay').text('状态: 运行中').css('background', 'darkkhaki');
+
+                    // 可以在这里调用连接虚拟机的函数，如果需要
+                    connectToVm(data.port); // 假设端口号在返回的数据中
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    // 处理错误
+                    $('#statusDisplay').text('状态: 重启错误').css('background', 'red');
+                    console.error('Error:', textStatus, errorThrown);
+                }
+            });
+        });
+
+        // 重置容器点击事件
+        $('#resetButton').on('click', function () {
+            // 获取需要重置的容器信息
+            const name = $('#inputBox').val(); // 假设名字缩写用来标识容器
+            const category = $('#selectBox').val(); // 假设类别用来标识容器
+
+            // 更新状态为 "重置中"
+            $('#statusDisplay').text('状态: 重置中...').css('background', 'orange');
+
+            // 发送重置容器的 AJAX 请求
+            $.ajax({
+                url: '/reset/', // Django视图的URL
+                type: 'POST',
+                data: {
+                    'name': name,
+                    'category': category,
+                },
+                success: function (data) {
+                    // 更新状态显示为 "重置成功"
+                    $('#statusDisplay').text('状态: 运行中').css('background', 'darkkhaki');
+                    connectToVm(data.port); // 假设端口号在返回的数据中
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    // 处理错误
+                    $('#statusDisplay').text('状态: 重置错误').css('background', 'red');
+                    console.error('Error:', textStatus, errorThrown);
+                }
+            });
+        });
+
+        // 停止容器点击事件
+        $('#stopButton').on('click', function () {
+            // 获取需要重置的容器信息
+            const name = $('#inputBox').val(); // 假设名字缩写用来标识容器
+            const category = $('#selectBox').val(); // 假设类别用来标识容器
+
+            // 更新状态为 "重置中"
+            $('#statusDisplay').text('状态: 关机中...').css('background', 'orange');
+
+            // 发送重置容器的 AJAX 请求
+            $.ajax({
+                url: '/stop/', // Django视图的URL
+                type: 'POST',
+                data: {
+                    'name': name,
+                    'category': category,
+                },
+                success: function (data) {
+                    // 更新状态显示为 "重置成功"
+                    $('#statusDisplay').text('状态: 已关机').css('background', 'darkkhaki');
+                },
+                error: function (xhr, textStatus, errorThrown) {
+                    // 处理错误
+                    $('#statusDisplay').text('状态: 关机错误').css('background', 'red');
+                    console.error('Error:', textStatus, errorThrown);
+                }
+            });
+        });
+
+        // 全屏按钮点击事件
+        $('#fullScreenButton').on('click', function () {
+            const screenElement = document.getElementById('screen');
+            toggleFullScreen(screenElement);
+        });
+
+        // 连接到虚拟机的函数，接受端口号和可选的断开现有连接的标志
+        function connectToVm(port, disconnectExisting = true) {
+            const host = 'ws://{{ ip }}:';
+            const path = '/websockify';
+            const url = `${host}${port}${path}`;
+            const password = "123456";
+
+            // 如果存在旧的 RFB 对象，先断开旧的连接
+            if (window.rfb && disconnectExisting) {
+                window.rfb.disconnect();
+            }
+
+            // 创建新的 RFB 对象
+            window.rfb = new RFB(document.getElementById('screen'), url, {credentials: {password: password}});
+
+            // 添加 noVNC 相关的事件监听器
+            window.rfb.addEventListener("connect", connectedToServer);
+            window.rfb.addEventListener("disconnect", disconnectedFromServer);
+            window.rfb.addEventListener("credentialsrequired", credentialsAreRequired);
+            window.rfb.addEventListener("desktopname", updateDesktopName);
+
+            window.rfb.viewOnly = readQueryVariable('view_only', false);
+            window.rfb.scaleViewport = readQueryVariable('scale', true); // 启用缩放
+            window.rfb.resizeSession = false; // 不改变远程桌面的实际分辨率
+        }
+
+        // noVNC 事件处理函数
+        function connectedToServer() {
+            console.log("Connected to VNC server.");
+        }
+
+        function disconnectedFromServer(e) {
+            if (e.detail.clean) {
+                console.log("Disconnected from VNC server cleanly.");
+            } else {
+                console.log("Disconnected from VNC server with errors or due to network issues.");
+            }
+        }
+
+        function credentialsAreRequired() {
+            console.log("VNC server is asking for credentials.");
+        }
+
+        function updateDesktopName(e) {
+            console.log("Desktop name is", e.detail.name);
+        }
+
+        function readQueryVariable(name, defaultValue) {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name) || defaultValue;
+        }
+
+        // 全屏切换函数
+        function toggleFullScreen(element) {
+            if (!document.fullscreenElement) {
+                if (element.requestFullscreen) {
+                    element.requestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+
+    });
+</script>
+</body>
+</html>
